@@ -1,0 +1,81 @@
+using UnityEngine;
+using UnityEngine.Networking;
+
+public class IPFSManager : MonoBehaviour
+{
+    private const string WEB3_STORAGE_API = "https://api.web3.storage";
+    private string apiToken;
+   
+    // Upload encrypted document to IPFS
+    public async Task<string> UploadToIPFS(EncryptedDocument encDoc)
+    {
+        // Show upload beam visual effect
+        ShowUploadBeam();
+       
+        // Combine IV + Tag + EncryptedData
+        byte[] combined = CombineEncryptedData(encDoc);
+       
+        // Create form data
+        WWWForm form = new WWWForm();
+        form.AddBinaryData("file", combined, encDoc.FileName + ".enc");
+       
+        // Upload to Web3.Storage
+        using (UnityWebRequest request = UnityWebRequest.Post(WEB3_STORAGE_API + "/upload", form))
+        {
+            request.SetRequestHeader("Authorization", $"Bearer {apiToken}");
+           
+            await request.SendWebRequest();
+           
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                string response = request.downloadHandler.text;
+                string cid = ParseCIDFromResponse(response);
+               
+                // Show success particles
+                SpawnSuccessParticles();
+               
+                return cid;
+            }
+        }
+       
+        return null;
+    }
+   
+    // Download from IPFS
+    public async Task<EncryptedDocument> DownloadFromIPFS(string cid, string fileName)
+    {
+        string url = $"https://w3s.link/ipfs/{cid}";
+       
+        // Show download beam
+        ShowDownloadBeam();
+       
+        using (UnityWebRequest request = UnityWebRequest.Get(url))
+        {
+            await request.SendWebRequest();
+           
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                byte[] data = request.downloadHandler.data;
+               
+                // Extract IV, Tag, and encrypted data
+                return SeparateEncryptedData(data, fileName);
+            }
+        }
+       
+        return null;
+    }
+   
+    // Visual upload beam effect
+    private void ShowUploadBeam()
+    {
+        // Create beam from document to ceiling (representing upload to cloud)
+        GameObject beam = Instantiate(uploadBeamPrefab);
+        LineRenderer line = beam.GetComponent<LineRenderer>();
+       
+        line.SetPosition(0, documentPosition);
+        line.SetPosition(1, documentPosition + Vector3.up * 10f);
+       
+        // Animate beam
+        StartCoroutine(AnimateBeam(line));
+    }
+}
