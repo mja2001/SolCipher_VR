@@ -1,0 +1,92 @@
+using Meta.XR;
+using UnityEngine;
+using UnityEngine.XR;
+
+public class PassthroughDocumentScanner : MonoBehaviour
+{
+    [Header("Passthrough")]
+    public OVRPassthroughLayer passthroughLayer;
+   
+    [Header("Camera Access")]
+    private Texture2D cameraTexture;
+   
+    // Enable passthrough to scan physical documents
+    public void EnableDocumentScan()
+    {
+        // Enable passthrough
+        passthroughLayer.enabled = true;
+        passthroughLayer.textureOpacity = 1.0f;
+       
+        // Access camera feed
+        OVRPlugin.Media.Initialize();
+       
+        // Show scan frame in user's view
+        ShowScanFrame();
+       
+        // Instructions via spatial audio
+        PlayVoiceInstruction("Hold document in view to scan");
+    }
+   
+    // Capture document with camera
+    public async Task<byte[]> CaptureDocument()
+    {
+        // Get camera frame
+        OVRPlugin.CameraDevice cameraDevice = OVRPlugin.CameraDevice.WebCamera0;
+        OVRPlugin.CameraExtrinsics extrinsics;
+        OVRPlugin.CameraIntrinsics intrinsics;
+       
+        // Capture frame
+        bool success = OVRPlugin.GetExternalCameraCalibration(
+            cameraDevice,
+            out extrinsics,
+            out intrinsics
+        );
+       
+        if (success)
+        {
+            // Process image with AI to detect document
+            byte[] imageData = await ProcessCameraFrame();
+           
+            // Show capture success feedback
+            PlayCaptureSound();
+            FlashScreen();
+           
+            return imageData;
+        }
+       
+        return null;
+    }
+   
+    // AI-powered document detection
+    private async Task<byte[]> ProcessCameraFrame()
+    {
+        // Use Meta's Context-aware AI to detect document boundaries
+        // Crop and enhance image
+        // Return processed document image
+       
+        return processedImage;
+    }
+   
+    // QR code scanning for wallet connection
+    public async Task<string> ScanQRCode()
+    {
+        passthroughLayer.enabled = true;
+       
+        // Show QR scan frame
+        ShowQRScanFrame();
+       
+        while (true)
+        {
+            byte[] frame = await CaptureDocument();
+            string qrData = DecodeQRCode(frame);
+           
+            if (!string.IsNullOrEmpty(qrData))
+            {
+                PlaySuccessSound();
+                return qrData;
+            }
+           
+            await Task.Yield();
+        }
+    }
+}
