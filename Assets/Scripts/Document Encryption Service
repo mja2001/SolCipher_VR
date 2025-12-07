@@ -1,0 +1,107 @@
+using System.Security.Cryptography;
+using UnityEngine;
+
+public class DocumentEncryptionService : MonoBehaviour
+{
+    // Encrypt document using AES-256-GCM
+    public async Task<EncryptedDocument> EncryptDocument(
+        byte[] fileData,
+        byte[] walletSignature,
+        string fileName
+    )
+    {
+        // Show encryption visualization
+        ShowEncryptionEffect();
+       
+        // Derive key from wallet signature
+        byte[] key = await DeriveKey(walletSignature);
+       
+        // Generate IV
+        byte[] iv = new byte[12];
+        using (var rng = new RNGCryptoServiceProvider())
+        {
+            rng.GetBytes(iv);
+        }
+       
+        // Encrypt using AES-GCM
+        using (var aes = new AesGcm(key))
+        {
+            byte[] ciphertext = new byte[fileData.Length];
+            byte[] tag = new byte[16];
+           
+            aes.Encrypt(
+                iv,
+                fileData,
+                ciphertext,
+                tag,
+                Encoding.UTF8.GetBytes(fileName)
+            );
+           
+            return new EncryptedDocument
+            {
+                EncryptedData = ciphertext,
+                IV = iv,
+                Tag = tag,
+                FileName = fileName
+            };
+        }
+    }
+   
+    // Decrypt document
+    public async Task<byte[]> DecryptDocument(
+        EncryptedDocument encryptedDoc,
+        byte[] walletSignature
+    )
+    {
+        ShowDecryptionEffect();
+       
+        byte[] key = await DeriveKey(walletSignature);
+       
+        using (var aes = new AesGcm(key))
+        {
+            byte[] plaintext = new byte[encryptedDoc.EncryptedData.Length];
+           
+            aes.Decrypt(
+                encryptedDoc.IV,
+                encryptedDoc.EncryptedData,
+                encryptedDoc.Tag,
+                plaintext,
+                Encoding.UTF8.GetBytes(encryptedDoc.FileName)
+            );
+           
+            return plaintext;
+        }
+    }
+   
+    // Derive encryption key from signature
+    private async Task<byte[]> DeriveKey(byte[] signature)
+    {
+        using (var sha256 = SHA256.Create())
+        {
+            return sha256.ComputeHash(signature);
+        }
+    }
+   
+    // Visual feedback for encryption
+    private void ShowEncryptionEffect()
+    {
+        // Spawn particle system around document
+        var particles = Instantiate(encryptionParticlePrefab, documentPosition, Quaternion.identity);
+        particles.Play();
+       
+        // Play encryption sound
+        AudioSource.PlayClipAtPoint(encryptionSound, documentPosition);
+       
+        // Haptic feedback
+        OVRInput.SetControllerVibration(0.5f, 0.5f, OVRInput.Controller.Active);
+    }
+}
+
+[System.Serializable]
+public class EncryptedDocument
+{
+    public byte[] EncryptedData;
+    public byte[] IV;
+    public byte[] Tag;
+    public string FileName;
+}
