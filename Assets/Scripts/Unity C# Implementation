@@ -1,0 +1,89 @@
+using UnityEngine;
+using Solana.Unity.SDK;
+using Solana.Unity.Wallet;
+using Meta.XR.MRUtilityKit;
+
+public class SolCipherWalletManager : MonoBehaviour
+{
+    [Header("Wallet Connection")]
+    public GameObject qrCodePanel;
+    public RawImage qrCodeDisplay;
+    public TextMeshProUGUI walletAddressText;
+   
+    private Web3 _solanaWeb3;
+    private Account _connectedAccount;
+   
+    // Initialize Solana connection
+    void Start()
+    {
+        Web3.Instance.WalletBase.OnWalletConnected += OnWalletConnected;
+        InitializeSolanaConnection();
+    }
+   
+    // Connect wallet via QR code
+    public async void ConnectWalletVR()
+    {
+        // Enable passthrough for QR scanning
+        OVRPassthroughLayer.Instance.enabled = true;
+       
+        // Generate WalletConnect QR code
+        string wcUri = await GenerateWalletConnectURI();
+        Texture2D qrCode = GenerateQRCode(wcUri);
+       
+        // Display in spatial UI
+        qrCodePanel.SetActive(true);
+        qrCodeDisplay.texture = qrCode;
+       
+        // Wait for mobile wallet to scan and connect
+        await WaitForWalletConnection();
+    }
+   
+    // Handle wallet connection
+    private void OnWalletConnected(Account account)
+    {
+        _connectedAccount = account;
+        walletAddressText.text = $"Connected: {account.PublicKey.ToString().Substring(0, 8)}...";
+       
+        // Disable passthrough
+        OVRPassthroughLayer.Instance.enabled = false;
+       
+        // Show success feedback
+        PlaySuccessHaptics();
+        SpawnConfirmationParticles();
+    }
+   
+    // Request signature for encryption key derivation
+    public async Task<byte[]> RequestSignature(string message)
+    {
+        // Display signature request in VR
+        ShowSignatureRequestPanel(message);
+       
+        // Wait for hand gesture confirmation
+        await WaitForHandConfirmation();
+       
+        // Sign message with connected wallet
+        byte[] signature = await _connectedAccount.Sign(
+            Encoding.UTF8.GetBytes(message)
+        );
+       
+        return signature;
+    }
+   
+    // Hand gesture confirmation
+    private async Task WaitForHandConfirmation()
+    {
+        // Monitor for pinch gesture with both hands
+        while (!IsPinchGestureDetected())
+        {
+            await Task.Yield();
+        }
+       
+        PlayConfirmationHaptics();
+    }
+   
+    private bool IsPinchGestureDetected()
+    {
+        return OVRInput.Get(OVRInput.Button.PinchIndexLeft) &&
+               OVRInput.Get(OVRInput.Button.PinchIndexRight);
+    }
+}
