@@ -1,0 +1,81 @@
+using Meta.XR;
+using UnityEngine;
+
+public class SpatialUIManager : MonoBehaviour
+{
+    [Header("UI Panels")]
+    public GameObject mainMenuPanel;
+    public GameObject uploadPanel;
+    public GameObject documentGallery;
+    public GameObject recipientSelector;
+   
+    [Header("Spatial Settings")]
+    public float panelDistance = 1.5f;
+    public float panelHeight = 1.5f;
+   
+    void Start()
+    {
+        InitializeSpatialUI();
+    }
+   
+    // Position UI panels in user's space
+    private void InitializeSpatialUI()
+    {
+        // Main menu in front of user
+        PositionPanel(mainMenuPanel, Vector3.forward * panelDistance, 0f);
+       
+        // Upload panel to the right
+        PositionPanel(uploadPanel, Quaternion.Euler(0, 45, 0) * Vector3.forward * panelDistance, 45f);
+       
+        // Gallery to the left
+        PositionPanel(documentGallery, Quaternion.Euler(0, -45, 0) * Vector3.forward * panelDistance, -45f);
+    }
+   
+    // Position panel relative to user
+    private void PositionPanel(GameObject panel, Vector3 localPosition, float yRotation)
+    {
+        Transform head = Camera.main.transform;
+       
+        Vector3 worldPosition = head.position + head.TransformDirection(localPosition);
+        worldPosition.y = panelHeight;
+       
+        panel.transform.position = worldPosition;
+        panel.transform.rotation = Quaternion.Euler(0, yRotation, 0);
+    }
+   
+    // Spawn document as 3D hologram
+    public GameObject SpawnDocument(DocumentData doc)
+    {
+        GameObject hologram = Instantiate(documentHologramPrefab);
+       
+        // Position in circular gallery around user
+        int index = documentGallery.transform.childCount;
+        float angle = index * (360f / maxDocuments);
+        Vector3 position = Quaternion.Euler(0, angle, 0) * Vector3.forward * 2f;
+       
+        hologram.transform.position = Camera.main.transform.position + position;
+        hologram.transform.LookAt(Camera.main.transform);
+       
+        // Add metadata display
+        var metadata = hologram.GetComponent<DocumentMetadataDisplay>();
+        metadata.SetData(doc);
+       
+        // Add interaction
+        var interactable = hologram.AddComponent<OVRGrabbable>();
+       
+        return hologram;
+    }
+   
+    // Handle hand ray selection
+    public void OnDocumentRayHit(GameObject document)
+    {
+        // Highlight document
+        document.GetComponent<Outline>().enabled = true;
+       
+        // Show preview panel
+        ShowDocumentPreview(document);
+       
+        // Haptic feedback
+        OVRInput.SetControllerVibration(0.2f, 0.1f, OVRInput.Controller.RTouch);
+    }
+}
