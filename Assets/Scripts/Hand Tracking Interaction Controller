@@ -1,0 +1,98 @@
+using Meta.XR;
+using UnityEngine;
+
+public class HandTrackingController : MonoBehaviour
+{
+    [Header("Hand Tracking")]
+    public OVRHand leftHand;
+    public OVRHand rightHand;
+   
+    [Header("Document Interaction")]
+    public GameObject selectedDocument;
+    public float pinchThreshold = 0.8f;
+   
+    private bool isPinching = false;
+   
+    void Update()
+    {
+        DetectPinchGestures();
+        DetectTwoHandedGestures();
+        HandleDocumentManipulation();
+    }
+   
+    // Detect pinch for selection
+    private void DetectPinchGestures()
+    {
+        // Left hand pinch
+        if (leftHand.GetFingerPinchStrength(OVRHand.HandFinger.Index) > pinchThreshold)
+        {
+            OnLeftPinch();
+        }
+       
+        // Right hand pinch
+        if (rightHand.GetFingerPinchStrength(OVRHand.HandFinger.Index) > pinchThreshold)
+        {
+            OnRightPinch();
+        }
+    }
+   
+    // Two-handed gestures for zoom/preview
+    private void DetectTwoHandedGestures()
+    {
+        if (IsBothHandsPinching())
+        {
+            float distance = Vector3.Distance(
+                leftHand.PointerPose.position,
+                rightHand.PointerPose.position
+            );
+           
+            // Scale document based on hand distance
+            if (selectedDocument != null)
+            {
+                selectedDocument.transform.localScale = Vector3.one * distance;
+            }
+        }
+    }
+   
+    // Direct touch UI
+    public void OnUIButtonTouched(string buttonName)
+    {
+        // Haptic feedback on touch
+        OVRInput.SetControllerVibration(0.3f, 0.1f, OVRInput.Controller.RTouch);
+       
+        switch (buttonName)
+        {
+            case "Share":
+                StartDocumentShare();
+                break;
+            case "Revoke":
+                RevokeAccess();
+                break;
+            case "Decrypt":
+                DecryptDocument();
+                break;
+        }
+    }
+   
+    // Microgestures for quick actions
+    private void DetectMicroGestures()
+    {
+        // Thumb up = approve/decrypt
+        if (IsThumbUp(rightHand))
+        {
+            ConfirmAction();
+        }
+       
+        // Hand wave = cancel/revoke
+        if (IsHandWaving(leftHand))
+        {
+            CancelAction();
+        }
+    }
+   
+    private bool IsBothHandsPinching()
+    {
+        return leftHand.GetFingerPinchStrength(OVRHand.HandFinger.Index) > pinchThreshold &&
+               rightHand.GetFingerPinchStrength(OVRHand.HandFinger.Index) > pinchThreshold;
+    }
+}
