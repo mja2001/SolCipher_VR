@@ -1,0 +1,104 @@
+using Solana.Unity.Rpc;
+using Solana.Unity.Rpc.Models;
+using Solana.Unity.Programs;
+
+public class SolanaContractManager : MonoBehaviour
+{
+    private IRpcClient rpcClient;
+    private PublicKey programId;
+   
+    void Start()
+    {
+        // Connect to Solana Devnet
+        rpcClient = ClientFactory.GetClient(Cluster.DevNet);
+        programId = new PublicKey("YOUR_PROGRAM_ID");
+    }
+   
+    // Upload document metadata on-chain
+    public async Task<string> UploadDocumentOnChain(
+        PublicKey owner,
+        string ipfsCid,
+        PublicKey recipient,
+        long expiry
+    )
+    {
+        // Show blockchain transaction visualization
+        ShowBlockchainAnimation();
+       
+        // Create document account
+        var documentAccount = Keypair.Generate();
+       
+        // Build transaction
+        var transaction = new Transaction();
+        transaction.Add(
+            SystemProgram.CreateAccount(
+                owner,
+                documentAccount.PublicKey,
+                rent,
+                dataSize,
+                programId
+            )
+        );
+       
+        // Add upload instruction
+        transaction.Add(new TransactionInstruction
+        {
+            ProgramId = programId,
+            Keys = new List<AccountMeta>
+            {
+                new AccountMeta(documentAccount.PublicKey, isSigner: true, isWritable: true),
+                new AccountMeta(owner, isSigner: true, isWritable: false),
+                new AccountMeta(recipient, isSigner: false, isWritable: false)
+            },
+            Data = EncodeUploadData(ipfsCid, recipient, expiry)
+        });
+       
+        // Sign and send
+        var result = await rpcClient.SendTransactionAsync(
+            transaction.Serialize(),
+            commitment: Commitment.Confirmed
+        );
+       
+        // Show confirmation particles
+        SpawnBlockchainConfirmation();
+       
+        return result.Result;
+    }
+   
+    // Check access permissions
+    public async Task<bool> CheckAccess(PublicKey documentKey, PublicKey userWallet)
+    {
+        // Fetch document account
+        var accountInfo = await rpcClient.GetAccountInfoAsync(documentKey);
+       
+        if (accountInfo.Result?.Value == null)
+            return false;
+       
+        // Parse document data
+        var docData = ParseDocumentData(accountInfo.Result.Value.Data);
+       
+        // Check recipient, expiry, revocation
+        bool hasAccess = docData.Recipient.Equals(userWallet) &&
+                        (docData.Expiry == 0 || DateTimeOffset.Now.ToUnixTimeSeconds() < docData.Expiry) &&
+                        !docData.IsRevoked;
+       
+        // Visualize access status
+        VisualizeAccessStatus(hasAccess);
+       
+        return hasAccess;
+    }
+   
+    // Visualize blockchain transaction
+    private void ShowBlockchainAnimation()
+    {
+        // Create holographic blockchain visualization
+        GameObject chain = Instantiate(blockchainVisPrefab);
+       
+        // Animate blocks connecting
+        var animator = chain.GetComponent<Animator>();
+        animator.SetTrigger("Transaction");
+       
+        // Play blockchain sound
+        AudioSource.PlayClipAtPoint(blockchainSound, Camera.main.transform.position);
+    }
+}
